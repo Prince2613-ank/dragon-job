@@ -1,10 +1,9 @@
 // FILE: lib/screens/saved_jobs_screen.dart
 
 import 'package:flutter/material.dart';
-import '../helpers/database_helper.dart'; // Import DB helper and Job model
-import 'job_details_screen.dart'; // Import Job Details screen
+import '../helpers/database_helper.dart';
+import 'job_details_screen.dart';
 
-// 1. Convert to StatefulWidget
 class SavedJobsScreen extends StatefulWidget {
   const SavedJobsScreen({super.key});
 
@@ -13,30 +12,26 @@ class SavedJobsScreen extends StatefulWidget {
 }
 
 class _SavedJobsScreenState extends State<SavedJobsScreen> {
-  // 2. Use a FutureBuilder to handle loading state
   late Future<List<Job>> _savedJobsFuture;
 
   @override
   void initState() {
     super.initState();
-    // 3. Load the jobs when the screen is first built
     _loadSavedJobs();
   }
 
-  // 4. Function to fetch jobs from the database
   void _loadSavedJobs() {
     setState(() {
       _savedJobsFuture = DatabaseHelper.instance.getAllSavedJobs();
     });
   }
 
-  // 5. Function to remove a job (will be called from the card)
-  Future<void> _removeJob(int id) async {
-    await DatabaseHelper.instance.deleteJob(id);
+  Future<void> _removeJob(Job job) async {
+    if (job.id == null) return;
+    await DatabaseHelper.instance.deleteJob(job.id!);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Job removed from saved list.')),
     );
-    // Refresh the list
     _loadSavedJobs();
   }
 
@@ -49,19 +44,17 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       backgroundColor: Colors.grey[100],
-      // 6. Use FutureBuilder to build the UI based on the database call
       body: FutureBuilder<List<Job>>(
         future: _savedJobsFuture,
         builder: (context, snapshot) {
-          // --- LOADING STATE ---
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          // --- ERROR STATE ---
+
           if (snapshot.hasError) {
             return Center(child: Text("Error: ${snapshot.error}"));
           }
-          // --- EMPTY STATE ---
+
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return Center(
               child: Column(
@@ -82,14 +75,12 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
             );
           }
 
-          // --- SUCCESS STATE (Data is loaded) ---
           final savedJobs = snapshot.data!;
           return ListView.builder(
             padding: const EdgeInsets.all(16.0),
             itemCount: savedJobs.length,
             itemBuilder: (context, index) {
-              final job = savedJobs[index];
-              return _buildJobCard(context: context, job: job);
+              return _buildJobCard(context: context, job: savedJobs[index]);
             },
           );
         },
@@ -97,9 +88,8 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
     );
   }
 
-  // 7. Re-usable Job Card widget
+  // ================= JOB CARD =================
   Widget _buildJobCard({required BuildContext context, required Job job}) {
-    // Simple icon mapping
     Map<String, IconData> iconMap = {
       "android": Icons.android,
       "business": Icons.business,
@@ -107,7 +97,9 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
       "computer": Icons.computer,
       "storage": Icons.storage,
       "school": Icons.school,
+      "work": Icons.work,
     };
+
     IconData logo = iconMap[job.logo] ?? Icons.work;
 
     return Card(
@@ -117,11 +109,21 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () {
-          // When tapping a saved job, go to details and refresh when we come back
+          // 🔥 Convert Job → AdminPost (runtime mapping)
+          final post = AdminPost(
+            id: job.postId,
+            postType: 'job',
+            role: job.title,
+            company: job.company,
+            salary: 'N/A',
+            location: job.location,
+            description: 'Saved job from your list',
+          );
+
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => JobDetailsScreen(job: job)),
-          ).then((_) => _loadSavedJobs()); // Refresh the list when returning
+            MaterialPageRoute(builder: (_) => JobDetailsScreen(post: post)),
+          ).then((_) => _loadSavedJobs());
         },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -153,12 +155,11 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
                   ],
                 ),
               ),
-              // 8. Add a "remove" button
               IconButton(
                 icon: const Icon(Icons.bookmark, color: Colors.blue),
                 tooltip: "Remove from saved",
                 onPressed: () {
-                  _removeJob(job.id!);
+                  _removeJob(job);
                 },
               ),
             ],

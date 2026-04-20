@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PostType {
+  job
+  internship
+  daily_wage
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         UserRole  @default(user)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdPosts Post[]    @relation("PostsByUser")
+  savedJobs    SavedJob[]
+}
+
+model Post {
+  id          Int       @id @default(autoincrement())
+  postType    PostType
+  role        String
+  company     String
+  salary      String
+  location    String
+  description String
+  createdById Int?
+  createdBy   User?     @relation("PostsByUser", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  savedBy     SavedJob[]
+
+  @@index([postType])
+}
+
+model SavedJob {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}

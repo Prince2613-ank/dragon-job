@@ -1,9 +1,8 @@
-// FILE: lib/screens/dashboard_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../helpers/database_helper.dart'; // Import Job model
-import 'job_details_screen.dart'; // Import Job Details screen
+
+import '../helpers/database_helper.dart';
+import 'job_details_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -13,151 +12,99 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _jobsAppliedCount = 0;
+  int profileCompletion = 0;
+  int resumeScore = 0;
+  int jobsApplied = 0;
+
+  List<AdminPost> recommendedPosts = [];
 
   @override
   void initState() {
     super.initState();
-    _loadJobsAppliedCount();
+    _loadDashboardData();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _loadJobsAppliedCount();
+    _loadDashboardData(); // refresh when returning
   }
 
-  Future<void> _loadJobsAppliedCount() async {
+  // ================= LOAD DATA =================
+  Future<void> _loadDashboardData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _jobsAppliedCount = prefs.getInt('jobsAppliedCount') ?? 0;
-    });
+
+    profileCompletion = prefs.getInt('profile_completion') ?? 0;
+    resumeScore = prefs.getInt('last_resume_score') ?? 0;
+    jobsApplied = prefs.getInt('jobsAppliedCount') ?? 0;
+
+    recommendedPosts = await DatabaseHelper.instance.getAllAdminPosts();
+
+    setState(() {});
   }
 
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
-    // We wrap the main column in a DefaultTabController
-    return DefaultTabController(
-      length: 3, // For the 3 tabs: Submitted, Review, Interviews
-      child: Scaffold(
-        backgroundColor: Colors.grey[100], // Light grey background
-        body: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Welcome Header
-                Text(
-                  "Welcome back, Prince!",
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Find your perfect job today.",
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 24),
-
-                // 2. PROFILE COMPLETION BAR
-                _buildProfileCompletion(),
-                const SizedBox(height: 24),
-
-                // 3. AI Resume Matcher Card
-                _buildAiMatcherCard(context),
-                const SizedBox(height: 24),
-
-                // 4. Stats Overview
-                _buildStatsOverview(),
-                const SizedBox(height: 24),
-
-                // 5. APPLICATION STATUS TRACKER
-                _buildApplicationTracker(),
-                const SizedBox(height: 24),
-
-                // 6. Recommended Jobs Section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Recommended for You",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        // *** THIS IS THE FIX ***
-                        Navigator.pushNamed(context, '/recommended_jobs');
-                      },
-                      child: const Text(
-                        "View All",
-                        style: TextStyle(color: Colors.blue),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // 7. Job List
-                _buildJobCard(
-                  job: Job(
-                    logo: "android",
-                    title: "Flutter Developer",
-                    company: "Google",
-                    location: "Mountain View, CA",
-                  ),
-                ),
-                _buildJobCard(
-                  job: Job(
-                    logo: "business",
-                    title: "Backend Engineer (Django)",
-                    company: "TechCorp",
-                    location: "Remote",
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 20),
+            _buildProfileCompletion(),
+            const SizedBox(height: 20),
+            _buildAiCard(context),
+            const SizedBox(height: 20),
+            _buildStats(),
+            const SizedBox(height: 30),
+            _buildRecommended(context),
+          ],
         ),
       ),
     );
   }
 
-  // --- HELPER WIDGETS ---
+  // ================= HEADER =================
+  Widget _buildHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: const [
+        Text(
+          "Welcome back!",
+          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(height: 6),
+        Text(
+          "Find your perfect job today.",
+          style: TextStyle(color: Colors.grey),
+        ),
+      ],
+    );
+  }
 
+  // ================= PROFILE COMPLETION =================
   Widget _buildProfileCompletion() {
-    double completion = 0.7; // 70%
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Profile Completion: 70%",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              "Profile Completion: $profileCompletion%",
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
             LinearProgressIndicator(
-              value: completion,
-              backgroundColor: Colors.grey[300],
-              color: Colors.blue,
-              minHeight: 10,
-              borderRadius: BorderRadius.circular(5),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "Complete your profile to get better job matches!",
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              value: profileCompletion / 100,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(10),
             ),
           ],
         ),
@@ -165,63 +112,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildApplicationTracker() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "My Applications",
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TabBar(
-            indicator: BoxDecoration(
-              color: Colors.blue,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.black54,
-            tabs: const [
-              Tab(text: "Submitted (15)"),
-              Tab(text: "In Review (4)"),
-              Tab(text: "Interviews (1)"),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 150, // Give the content area a fixed height
-          child: TabBarView(
-            children: [
-              Center(child: Text("Showing 15 Submitted Applications")),
-              Center(child: Text("Showing 4 Applications In Review")),
-              Center(child: Text("Showing 1 Upcoming Interview")),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAiMatcherCard(BuildContext context) {
+  // ================= AI CARD =================
+  Widget _buildAiCard(BuildContext context) {
     return Card(
-      elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       color: Colors.blue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            const Icon(Icons.insights, size: 40, color: Colors.white),
+            const Icon(Icons.insights, color: Colors.white, size: 40),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -235,23 +135,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    "Upload your resume to get AI-powered job recommendations.",
-                    style: TextStyle(fontSize: 14, color: Colors.white70),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Resume Score: $resumeScore%",
+                    style: const TextStyle(color: Colors.white70),
                   ),
                   const SizedBox(height: 10),
                   OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
                     onPressed: () {
                       Navigator.pushNamed(context, '/manage_resume');
                     },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white),
+                    ),
                     child: const Text("Analyze Now"),
                   ),
                 ],
@@ -263,123 +160,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatsOverview() {
+  // ================= STATS =================
+  Widget _buildStats() {
     return Row(
       children: [
-        Expanded(
-          child: Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "$_jobsAppliedCount",
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Jobs Applied",
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        _statCard(title: "Jobs Applied", value: jobsApplied.toString()),
         const SizedBox(width: 16),
-        Expanded(
-          child: Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "8",
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Profile Views",
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        _statCard(title: "Resume Score", value: "$resumeScore%"),
       ],
     );
   }
 
-  // Helper for Job Card
-  Widget _buildJobCard({required Job job}) {
-    IconData logo = job.logo == "android" ? Icons.android : Icons.business;
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin: const EdgeInsets.only(bottom: 12.0),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => JobDetailsScreen(job: job)),
-          ).then((_) => _loadJobsAppliedCount());
-        },
+  Widget _statCard({required String title, required String value}) {
+    return Expanded(
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(logo, size: 40, color: Colors.blue),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      job.title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      job.company,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      job.location,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
-                  ],
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
                 ),
               ),
-              Icon(Icons.bookmark_border, color: Colors.grey[500]),
+              const SizedBox(height: 6),
+              Text(title, style: const TextStyle(color: Colors.grey)),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  // ================= RECOMMENDED =================
+  Widget _buildRecommended(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "Recommended for You",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/recommended_jobs');
+              },
+              child: const Text("View All"),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        if (recommendedPosts.isEmpty) const Text("No jobs available right now"),
+
+        ...recommendedPosts
+            .take(3)
+            .map(
+              (post) => Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.work, color: Colors.blue),
+                  title: Text(post.role),
+                  subtitle: Text("${post.company} • ${post.location}"),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => JobDetailsScreen(post: post),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+      ],
     );
   }
 }

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../helpers/database_helper.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -11,29 +14,97 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
+
+  bool isButtonEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController.addListener(_validateInputs);
+    emailController.addListener(_validateInputs);
+    passwordController.addListener(_validateInputs);
+    confirmPasswordController.addListener(_validateInputs);
+  }
+
+  void _validateInputs() {
+    setState(() {
+      isButtonEnabled =
+          nameController.text.isNotEmpty &&
+          emailController.text.isNotEmpty &&
+          passwordController.text.isNotEmpty &&
+          confirmPasswordController.text.isNotEmpty;
+    });
+  }
+
+  Future<void> handleSignup() async {
+    if (passwordController.text != confirmPasswordController.text) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+      return;
+    }
+
+    try {
+      // 1️⃣ Insert user
+      final userId = await DatabaseHelper.instance.insertUser(
+        nameController.text.trim(),
+        emailController.text.trim(),
+        passwordController.text.trim(),
+      );
+
+      // 2️⃣ Save session
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('loggedInUserId', userId);
+      await prefs.setString('loggedInUserName', nameController.text.trim());
+      await prefs.setString('loggedInUserEmail', emailController.text.trim());
+      await prefs.setString('loggedInUserRole', 'user');
+
+      // 3️⃣ Navigate to main app
+      Navigator.pushReplacementNamed(context, '/main');
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final message = statusCode == 409
+          ? 'User already exists'
+          : 'Signup failed. Please check backend connection.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signup failed. Please try again.')),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sign Up', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blue, // Blue app bar
-        iconTheme: const IconThemeData(color: Colors.white), // White back arrow
-        elevation: 0,
+        backgroundColor: Colors.blue,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
-        // Prevents overflow when keyboard appears
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 20), // Add some top space
-              // Full Name Input Field
               TextField(
-                keyboardType: TextInputType.name,
+                controller: nameController,
                 decoration: InputDecoration(
                   labelText: 'Full Name',
-                  hintText: 'Enter your full name',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -41,13 +112,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Email Input Field
               TextField(
+                controller: emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   labelText: 'Email',
-                  hintText: 'Enter your email',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -55,13 +124,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Password Input Field
               TextField(
+                controller: passwordController,
                 obscureText: !_isPasswordVisible,
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  hintText: 'Enter your password',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -71,7 +138,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       _isPasswordVisible
                           ? Icons.visibility
                           : Icons.visibility_off,
-                      color: Colors.grey,
                     ),
                     onPressed: () {
                       setState(() {
@@ -82,13 +148,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Confirm Password Input Field
               TextField(
+                controller: confirmPasswordController,
                 obscureText: !_isConfirmPasswordVisible,
                 decoration: InputDecoration(
                   labelText: 'Confirm Password',
-                  hintText: 'Re-enter your password',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -98,7 +162,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       _isConfirmPasswordVisible
                           ? Icons.visibility
                           : Icons.visibility_off,
-                      color: Colors.grey,
                     ),
                     onPressed: () {
                       setState(() {
@@ -110,30 +173,28 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 30),
 
-              // Sign Up Button
+              /// 🔥 ENABLE / DISABLE BUTTON
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 5,
+                  onPressed: isButtonEnabled ? handleSignup : null,
+                  style: ButtonStyle(
+                    backgroundColor: MaterialStateProperty.resolveWith<Color>((
+                      states,
+                    ) {
+                      if (states.contains(MaterialState.disabled)) {
+                        return Colors.grey.shade400;
+                      }
+                      return Colors.blue;
+                    }),
                   ),
                   child: const Text(
                     'Sign Up',
                     style: TextStyle(fontSize: 18, color: Colors.white),
                   ),
-                  onPressed: () {
-                    // Add signup logic here
-                    // On success:
-                    Navigator.pushReplacementNamed(context, '/main');
-                  },
                 ),
               ),
-              const SizedBox(height: 20), // Add bottom space
             ],
           ),
         ),

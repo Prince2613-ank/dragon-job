@@ -2,12 +2,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../helpers/database_helper.dart'; // Import your helpers
+import '../helpers/database_helper.dart';
 
 class JobDetailsScreen extends StatefulWidget {
-  final Job job; // This screen will accept a Job object
+  final AdminPost post; // 🔥 ADMIN POST
 
-  const JobDetailsScreen({super.key, required this.job});
+  const JobDetailsScreen({super.key, required this.post});
 
   @override
   State<JobDetailsScreen> createState() => _JobDetailsScreenState();
@@ -23,118 +23,112 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     _checkIfSaved();
   }
 
-  // Check if the job is already in the database
+  // ================= SAVE CHECK =================
   void _checkIfSaved() async {
     final allJobs = await DatabaseHelper.instance.getAllSavedJobs();
-    // Check for a job with the same title AND company
     setState(() {
-      _isSaved = allJobs.any(
-        (job) =>
-            job.title == widget.job.title && job.company == widget.job.company,
-      );
+      _isSaved = allJobs.any((job) {
+        if (widget.post.id != null && job.postId != null) {
+          return job.postId == widget.post.id;
+        }
+        return job.title == widget.post.role && job.company == widget.post.company;
+      });
     });
   }
 
-  // Toggle the save state
+  // ================= SAVE / UNSAVE =================
   void _toggleSave() async {
     if (_isSaved) {
-      // --- REMOVE JOB ---
-      final allJobs = await DatabaseHelper.instance.getAllSavedJobs();
-      Job? jobToDelete;
-      // Find the specific job in the DB
-      for (var job in allJobs) {
-        if (job.title == widget.job.title &&
-            job.company == widget.job.company) {
-          jobToDelete = job;
-          break;
-        }
-      }
-      // If we found it, delete it by its unique ID
-      if (jobToDelete != null) {
-        await DatabaseHelper.instance.deleteJob(jobToDelete.id!);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Job removed from saved list.')),
-        );
-      }
-      setState(() {
-        _isSaved = false;
-      });
+      await DatabaseHelper.instance.deleteSavedJobForPost(widget.post);
+
+      setState(() => _isSaved = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Job removed from saved list')),
+      );
     } else {
-      // --- ADD JOB ---
-      await DatabaseHelper.instance.insertJob(widget.job);
-      setState(() {
-        _isSaved = true;
-      });
+      // 🔥 Convert AdminPost → Job for saved jobs
+      final job = Job(
+        postId: widget.post.id,
+        title: widget.post.role,
+        company: widget.post.company,
+        location: widget.post.location,
+        logo: 'work',
+      );
+
+      await DatabaseHelper.instance.insertJob(job);
+
+      setState(() => _isSaved = true);
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Job saved!')));
+      ).showSnackBar(const SnackBar(content: Text('Job saved successfully')));
     }
   }
 
-  // Handle the Apply button
+  // ================= APPLY =================
   void _applyForJob() async {
     final prefs = await SharedPreferences.getInstance();
-    int currentCount = prefs.getInt('jobsAppliedCount') ?? 0;
-    currentCount++;
-    await prefs.setInt('jobsAppliedCount', currentCount);
+    int count = prefs.getInt('jobsAppliedCount') ?? 0;
+    await prefs.setInt('jobsAppliedCount', count + 1);
 
-    setState(() {
-      _isApplied = true;
-    });
+    setState(() => _isApplied = true);
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Application submitted!')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Application submitted successfully')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final saveIcon = Icon(
-      _isSaved ? Icons.bookmark : Icons.bookmark_border,
-      color: Colors.white,
-    );
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.job.company, style: TextStyle(color: Colors.white)),
+        title: Text(
+          widget.post.company,
+          style: const TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.blue,
         iconTheme: const IconThemeData(color: Colors.white),
-        actions: [IconButton(icon: saveIcon, onPressed: _toggleSave)],
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isSaved ? Icons.bookmark : Icons.bookmark_border,
+              color: Colors.white,
+            ),
+            onPressed: _toggleSave,
+          ),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
+                  // ================= HEADER =================
                   Row(
                     children: [
-                      Icon(
-                        Icons.android,
-                        size: 60,
-                        color: Colors.blue,
-                      ), // Placeholder
+                      const Icon(Icons.work, size: 60, color: Colors.blue),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              widget.job.title,
+                              widget.post.role,
                               style: const TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
-                              widget.job.company,
+                              widget.post.company,
                               style: const TextStyle(fontSize: 16),
                             ),
                             Text(
-                              widget.job.location,
+                              widget.post.location,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -147,9 +141,25 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   ),
                   const Divider(height: 32),
 
-                  // Job Description
+                  // ================= SALARY =================
                   Text(
-                    "About this job",
+                    "Compensation",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.post.salary,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+
+                  const Divider(height: 32),
+
+                  // ================= DESCRIPTION =================
+                  Text(
+                    "About this role",
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -157,7 +167,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+                    widget.post.description,
                     style: TextStyle(
                       fontSize: 16,
                       height: 1.5,
@@ -169,9 +179,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
             ),
           ),
 
-          // Bottom Apply Bar
+          // ================= APPLY BUTTON =================
           Container(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [

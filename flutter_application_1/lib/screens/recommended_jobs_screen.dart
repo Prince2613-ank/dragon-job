@@ -1,48 +1,34 @@
 // FILE: lib/screens/recommended_jobs_screen.dart
 
 import 'package:flutter/material.dart';
-import '../helpers/database_helper.dart'; // Import Job model
-import 'job_details_screen.dart'; // Import Job Details screen
+import '../helpers/database_helper.dart';
+import 'job_details_screen.dart';
 
-class RecommendedJobsScreen extends StatelessWidget {
+class RecommendedJobsScreen extends StatefulWidget {
   const RecommendedJobsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // We create a dummy list of jobs here
-    final List<Job> recommendedJobs = [
-      Job(
-        logo: "android",
-        title: "Flutter Developer",
-        company: "Google",
-        location: "Mountain View, CA",
-      ),
-      Job(
-        logo: "business",
-        title: "Backend Engineer (Django)",
-        company: "TechCorp",
-        location: "Remote",
-      ),
-      Job(
-        logo: "design_services",
-        title: "UI/UX Designer",
-        company: "Creative Inc.",
-        location: "New York, NY",
-      ),
-      Job(
-        logo: "computer",
-        title: "AI/ML Engineer",
-        company: "Data Future",
-        location: "Remote",
-      ),
-      Job(
-        logo: "android",
-        title: "Junior Flutter Developer",
-        company: "Startup Hub",
-        location: "Austin, TX",
-      ),
-    ];
+  State<RecommendedJobsScreen> createState() => _RecommendedJobsScreenState();
+}
 
+class _RecommendedJobsScreenState extends State<RecommendedJobsScreen> {
+  List<AdminPost> _recommendedJobs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecommendedJobs();
+  }
+
+  Future<void> _loadRecommendedJobs() async {
+    final jobs = await DatabaseHelper.instance.getPostsByType('job');
+    setState(() {
+      _recommendedJobs = jobs;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -53,27 +39,31 @@ class RecommendedJobsScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       backgroundColor: Colors.grey[100],
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: recommendedJobs.length,
-        itemBuilder: (context, index) {
-          return _buildJobCard(context: context, job: recommendedJobs[index]);
-        },
-      ),
+      body: _recommendedJobs.isEmpty
+          ? const Center(
+              child: Text(
+                "No recommended jobs available",
+                style: TextStyle(fontSize: 16),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: _recommendedJobs.length,
+              itemBuilder: (context, index) {
+                return _buildJobCard(
+                  context: context,
+                  post: _recommendedJobs[index],
+                );
+              },
+            ),
     );
   }
 
-  // We copy the same _buildJobCard helper for consistency
-  Widget _buildJobCard({required BuildContext context, required Job job}) {
-    // Simple icon mapping
-    Map<String, IconData> iconMap = {
-      "android": Icons.android,
-      "business": Icons.business,
-      "design_services": Icons.design_services,
-      "computer": Icons.computer,
-    };
-    IconData logo = iconMap[job.logo] ?? Icons.work;
-
+  // ================= JOB CARD =================
+  Widget _buildJobCard({
+    required BuildContext context,
+    required AdminPost post,
+  }) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -83,21 +73,21 @@ class RecommendedJobsScreen extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => JobDetailsScreen(job: job)),
+            MaterialPageRoute(builder: (_) => JobDetailsScreen(post: post)),
           );
         },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(
             children: [
-              Icon(logo, size: 40, color: Colors.blue),
+              const Icon(Icons.work, size: 40, color: Colors.blue),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      job.title,
+                      post.role,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -105,18 +95,26 @@ class RecommendedJobsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      job.company,
+                      post.company,
                       style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      job.location,
+                      post.location,
                       style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Salary: ${post.salary}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.bookmark_border, color: Colors.grey[500]),
+              const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),
         ),

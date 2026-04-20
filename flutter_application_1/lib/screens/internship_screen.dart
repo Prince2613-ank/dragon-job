@@ -1,10 +1,9 @@
 // FILE: lib/screens/internship_screen.dart
 
 import 'package:flutter/material.dart';
-import '../helpers/database_helper.dart'; // Import Job model
-import 'job_details_screen.dart'; // Import Job Details screen
+import '../helpers/database_helper.dart';
+import 'job_details_screen.dart';
 
-// 1. Convert to StatefulWidget
 class InternshipScreen extends StatefulWidget {
   const InternshipScreen({super.key});
 
@@ -13,50 +12,29 @@ class InternshipScreen extends StatefulWidget {
 }
 
 class _InternshipScreenState extends State<InternshipScreen> {
-  // 2. Define our state variables
   final TextEditingController _searchController = TextEditingController();
 
-  // This is our master list of internships
-  final List<Job> _allInternships = [
-    Job(
-      logo: "school",
-      title: "Flutter Developer Intern",
-      company: "Google",
-      location: "Remote (Summer 2026)",
-    ),
-    Job(
-      logo: "computer",
-      title: "AI/ML Intern",
-      company: "Future AI",
-      location: "Boston, MA",
-    ),
-    Job(
-      logo: "design_services",
-      title: "UI/UX Design Intern",
-      company: "Creative Inc.",
-      location: "New York, NY",
-    ),
-    Job(
-      logo: "business",
-      title: "Backend Intern (Django)",
-      company: "TechCorp",
-      location: "Remote",
-    ),
-  ];
+  List<AdminPost> _allInternships = [];
+  List<AdminPost> _displayedInternships = [];
 
-  // This is the list that will be displayed on screen
-  List<Job> _displayedInternships = [];
-
-  // Sort state
   bool _isSortedAscending = true;
 
   @override
   void initState() {
     super.initState();
-    // Initially, the displayed list is the full list
-    _displayedInternships = _allInternships;
-    // Add a listener to the search controller
+    _loadInternships();
     _searchController.addListener(_filterInternships);
+  }
+
+  Future<void> _loadInternships() async {
+    final internships = await DatabaseHelper.instance.getPostsByType(
+      'internship',
+    );
+
+    setState(() {
+      _allInternships = internships;
+      _displayedInternships = internships;
+    });
   }
 
   @override
@@ -66,72 +44,71 @@ class _InternshipScreenState extends State<InternshipScreen> {
     super.dispose();
   }
 
-  // 3. Create the filter/search function
+  // ================= SEARCH =================
   void _filterInternships() {
     String query = _searchController.text.toLowerCase();
 
     setState(() {
       _displayedInternships = _allInternships.where((internship) {
-        // Simple search logic
-        final titleMatch = internship.title.toLowerCase().contains(query);
-        final companyMatch = internship.company.toLowerCase().contains(query);
-        return titleMatch || companyMatch;
+        return internship.role.toLowerCase().contains(query) ||
+            internship.company.toLowerCase().contains(query);
       }).toList();
-
-      // Apply sorting
-      _sortInternships();
     });
   }
 
-  // 4. Create the sort function
+  // ================= SORT =================
   void _sortInternships() {
     setState(() {
       if (_isSortedAscending) {
-        _displayedInternships.sort((a, b) => a.title.compareTo(b.title)); // A-Z
+        _displayedInternships.sort((a, b) => a.role.compareTo(b.role)); // A-Z
       } else {
-        _displayedInternships.sort((a, b) => b.title.compareTo(a.title)); // Z-A
+        _displayedInternships.sort((a, b) => b.role.compareTo(a.role)); // Z-A
       }
-      _isSortedAscending = !_isSortedAscending; // Toggle for next tap
+      _isSortedAscending = !_isSortedAscending;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100], // Light grey background
+      backgroundColor: Colors.grey[100],
       body: Column(
         children: [
-          // 1. Search, Sort, and Filter Bar
           _buildSearchAndFilterBar(context),
 
-          // 2. Scrollable List of Internships
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: _displayedInternships.length, // Use the displayed list
-              itemBuilder: (context, index) {
-                return _buildInternshipCard(
-                  context: context,
-                  internship: _displayedInternships[index],
-                );
-              },
-            ),
+            child: _displayedInternships.isEmpty
+                ? const Center(
+                    child: Text(
+                      "No internships available",
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16.0),
+                    itemCount: _displayedInternships.length,
+                    itemBuilder: (context, index) {
+                      return _buildInternshipCard(
+                        context: context,
+                        internship: _displayedInternships[index],
+                      );
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
 
-  // Helper Widget for Search Bar
+  // ================= SEARCH / FILTER BAR =================
   Widget _buildSearchAndFilterBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          // Search Field
           Expanded(
             child: TextField(
-              controller: _searchController, // 5. Connect the controller
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: "Search for internships...",
                 prefixIcon: const Icon(Icons.search),
@@ -141,38 +118,32 @@ class _InternshipScreenState extends State<InternshipScreen> {
                 ),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: EdgeInsets.zero,
               ),
             ),
           ),
           const SizedBox(width: 10),
 
-          // 6. ADD THE SORT BUTTON
           IconButton(
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
-              padding: const EdgeInsets.all(12),
             ),
-            icon: Icon(Icons.sort_by_alpha, color: Colors.blue),
-            onPressed: _sortInternships, // Call the sort function
+            icon: const Icon(Icons.sort_by_alpha, color: Colors.blue),
+            onPressed: _sortInternships,
           ),
           const SizedBox(width: 10),
 
-          // 7. UPDATE THE FILTER BUTTON
           IconButton(
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
-              padding: const EdgeInsets.all(12),
             ),
             icon: const Icon(Icons.filter_list, color: Colors.blue),
             onPressed: () {
-              // Open the full-page filter screen
               Navigator.pushNamed(context, '/filters');
             },
           ),
@@ -181,20 +152,11 @@ class _InternshipScreenState extends State<InternshipScreen> {
     );
   }
 
-  // Helper Widget for a single Internship Card
+  // ================= INTERNSHIP CARD =================
   Widget _buildInternshipCard({
     required BuildContext context,
-    required Job internship, // Use the Job model
+    required AdminPost internship,
   }) {
-    // Simple icon mapping
-    Map<String, IconData> iconMap = {
-      "school": Icons.school,
-      "computer": Icons.computer,
-      "design_services": Icons.design_services,
-      "business": Icons.business,
-    };
-    IconData logo = iconMap[internship.logo] ?? Icons.work;
-
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -202,11 +164,10 @@ class _InternshipScreenState extends State<InternshipScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () {
-          // Navigate to the JobDetailsScreen
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => JobDetailsScreen(job: internship),
+              builder: (_) => JobDetailsScreen(post: internship),
             ),
           );
         },
@@ -214,14 +175,14 @@ class _InternshipScreenState extends State<InternshipScreen> {
           padding: const EdgeInsets.all(12.0),
           child: Row(
             children: [
-              Icon(logo, size: 40, color: Colors.blue),
+              const Icon(Icons.school, size: 40, color: Colors.blue),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      internship.title,
+                      internship.role,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -237,10 +198,18 @@ class _InternshipScreenState extends State<InternshipScreen> {
                       internship.location,
                       style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Stipend: ${internship.salary}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Icon(Icons.bookmark_border, color: Colors.grey[500]),
+              const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),
         ),

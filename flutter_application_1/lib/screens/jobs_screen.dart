@@ -1,10 +1,9 @@
 // FILE: lib/screens/jobs_screen.dart
 
 import 'package:flutter/material.dart';
-import '../helpers/database_helper.dart'; // Import Job model
-import 'job_details_screen.dart'; // Import Job Details screen
+import '../helpers/database_helper.dart';
+import 'job_details_screen.dart';
 
-// 1. Convert to StatefulWidget
 class JobsScreen extends StatefulWidget {
   const JobsScreen({super.key});
 
@@ -13,62 +12,26 @@ class JobsScreen extends StatefulWidget {
 }
 
 class _JobsScreenState extends State<JobsScreen> {
-  // 2. Define our state variables
   final TextEditingController _searchController = TextEditingController();
 
-  // This is our master list of jobs
-  final List<Job> _allJobs = [
-    Job(
-      logo: "android",
-      title: "Senior Flutter Developer",
-      company: "Google",
-      location: "Mountain View, CA",
-    ),
-    Job(
-      logo: "business",
-      title: "Backend Engineer (Django)",
-      company: "TechCorp",
-      location: "Remote",
-    ),
-    Job(
-      logo: "design_services",
-      title: "UI/UX Designer",
-      company: "Creative Inc.",
-      location: "New York, NY",
-    ),
-    Job(
-      logo: "computer",
-      title: "Data Scientist (AI/ML)",
-      company: "Future AI",
-      location: "Boston, MA",
-    ),
-    Job(
-      logo: "storage",
-      title: "PostgreSQL DBA",
-      company: "DataStax",
-      location: "Remote",
-    ),
-    Job(
-      logo: "android",
-      title: "Junior Flutter Developer",
-      company: "Startup Hub",
-      location: "Austin, TX",
-    ),
-  ];
+  List<AdminPost> _allJobs = [];
+  List<AdminPost> _displayedJobs = [];
 
-  // This is the list that will be displayed on screen
-  List<Job> _displayedJobs = [];
-
-  // Sort state
   bool _isSortedAscending = true;
 
   @override
   void initState() {
     super.initState();
-    // Initially, the displayed list is the full list
-    _displayedJobs = _allJobs;
-    // Add a listener to the search controller
+    _loadJobs();
     _searchController.addListener(_filterJobs);
+  }
+
+  Future<void> _loadJobs() async {
+    final jobs = await DatabaseHelper.instance.getPostsByType('job');
+    setState(() {
+      _allJobs = jobs;
+      _displayedJobs = jobs;
+    });
   }
 
   @override
@@ -78,72 +41,71 @@ class _JobsScreenState extends State<JobsScreen> {
     super.dispose();
   }
 
-  // 3. Create the filter/search function
+  // ================= SEARCH =================
   void _filterJobs() {
-    String query = _searchController.text.toLowerCase();
+    final query = _searchController.text.toLowerCase();
 
     setState(() {
       _displayedJobs = _allJobs.where((job) {
-        // Simple search logic
-        final titleMatch = job.title.toLowerCase().contains(query);
-        final companyMatch = job.company.toLowerCase().contains(query);
-        return titleMatch || companyMatch;
+        return job.role.toLowerCase().contains(query) ||
+            job.company.toLowerCase().contains(query);
       }).toList();
-
-      // Apply sorting
-      _sortJobs();
     });
   }
 
-  // 4. Create the sort function
+  // ================= SORT =================
   void _sortJobs() {
     setState(() {
       if (_isSortedAscending) {
-        _displayedJobs.sort((a, b) => a.title.compareTo(b.title)); // A-Z
+        _displayedJobs.sort((a, b) => a.role.compareTo(b.role)); // A-Z
       } else {
-        _displayedJobs.sort((a, b) => b.title.compareTo(a.title)); // Z-A
+        _displayedJobs.sort((a, b) => b.role.compareTo(a.role)); // Z-A
       }
-      _isSortedAscending = !_isSortedAscending; // Toggle for next tap
+      _isSortedAscending = !_isSortedAscending;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100], // Light grey background
+      backgroundColor: Colors.grey[100],
       body: Column(
         children: [
-          // 1. Search and Filter Bar
           _buildSearchAndFilterBar(context),
 
-          // 2. Scrollable List of Jobs
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: _displayedJobs.length, // Use the displayed list
-              itemBuilder: (context, index) {
-                return _buildJobCard(
-                  context: context,
-                  job: _displayedJobs[index],
-                );
-              },
-            ),
+            child: _displayedJobs.isEmpty
+                ? const Center(
+                    child: Text(
+                      "No jobs available",
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16.0),
+                    itemCount: _displayedJobs.length,
+                    itemBuilder: (context, index) {
+                      return _buildJobCard(
+                        context: context,
+                        job: _displayedJobs[index],
+                      );
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
 
-  // Helper Widget for Search Bar
+  // ================= SEARCH / FILTER BAR =================
   Widget _buildSearchAndFilterBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          // Search Field
           Expanded(
             child: TextField(
-              controller: _searchController, // 5. Connect the controller
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: "Search for jobs...",
                 prefixIcon: const Icon(Icons.search),
@@ -153,41 +115,33 @@ class _JobsScreenState extends State<JobsScreen> {
                 ),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: EdgeInsets.zero,
               ),
             ),
           ),
           const SizedBox(width: 10),
 
-          // 6. ADD THE SORT BUTTON
           IconButton(
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
-              padding: const EdgeInsets.all(12),
             ),
-            icon: Icon(Icons.sort_by_alpha, color: Colors.blue),
-            onPressed: _sortJobs, // Call the sort function
+            icon: const Icon(Icons.sort_by_alpha, color: Colors.blue),
+            onPressed: _sortJobs,
           ),
           const SizedBox(width: 10),
 
-          // 7. UPDATE THE FILTER BUTTON
           IconButton(
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
-              padding: const EdgeInsets.all(12),
             ),
             icon: const Icon(Icons.filter_list, color: Colors.blue),
             onPressed: () {
-              // Open the new full-page filter screen
               Navigator.pushNamed(context, '/filters');
-              // In a real app, you'd use .then() to get data back
-              // and then call _filterJobs()
             },
           ),
         ],
@@ -195,17 +149,11 @@ class _JobsScreenState extends State<JobsScreen> {
     );
   }
 
-  // Helper Widget for a single Job Card
-  Widget _buildJobCard({required BuildContext context, required Job job}) {
-    Map<String, IconData> iconMap = {
-      "android": Icons.android,
-      "business": Icons.business,
-      "design_services": Icons.design_services,
-      "computer": Icons.computer,
-      "storage": Icons.storage,
-    };
-    IconData logo = iconMap[job.logo] ?? Icons.work;
-
+  // ================= JOB CARD =================
+  Widget _buildJobCard({
+    required BuildContext context,
+    required AdminPost job,
+  }) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -215,21 +163,21 @@ class _JobsScreenState extends State<JobsScreen> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => JobDetailsScreen(job: job)),
+            MaterialPageRoute(builder: (_) => JobDetailsScreen(post: job)),
           );
         },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(
             children: [
-              Icon(logo, size: 40, color: Colors.blue),
+              const Icon(Icons.work, size: 40, color: Colors.blue),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      job.title,
+                      job.role,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -245,10 +193,18 @@ class _JobsScreenState extends State<JobsScreen> {
                       job.location,
                       style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Salary: ${job.salary}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Icon(Icons.bookmark_border, color: Colors.grey[500]),
+              const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),
         ),

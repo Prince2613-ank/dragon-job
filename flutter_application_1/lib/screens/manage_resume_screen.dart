@@ -1,18 +1,40 @@
-// FILE: lib/screens/manage_resume_screen.dart
-
-import 'dart:io';
+import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-// Helper class to manage resume data
+/// ================= RESUME MODEL =================
 class ResumeFile {
   String name;
   String path;
   bool isDefault;
+  List<String> skills;
 
-  ResumeFile({required this.name, required this.path, this.isDefault = false});
+  ResumeFile({
+    required this.name,
+    required this.path,
+    this.isDefault = false,
+    required this.skills,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'path': path,
+    'isDefault': isDefault,
+    'skills': skills,
+  };
+
+  factory ResumeFile.fromMap(Map<String, dynamic> map) {
+    return ResumeFile(
+      name: map['name'],
+      path: map['path'],
+      isDefault: map['isDefault'] ?? false,
+      skills: List<String>.from(map['skills'] ?? []),
+    );
+  }
 }
 
+/// ================= SCREEN =================
 class ManageResumeScreen extends StatefulWidget {
   const ManageResumeScreen({super.key});
 
@@ -21,100 +43,112 @@ class ManageResumeScreen extends StatefulWidget {
 }
 
 class _ManageResumeScreenState extends State<ManageResumeScreen> {
-  List<ResumeFile> _resumes = [
-    ResumeFile(name: "my_old_resume.pdf", path: "/dummy/path", isDefault: true),
-  ];
+  List<ResumeFile> _resumes = [];
   bool _isLoading = false;
 
-  // --- 1. NEW HELPER FUNCTION ---
-  // A central function to add any new resume to our list
-  void _addNewResumeToList(String path) {
-    // Get the file name from the full path
-    final String fileName = path.split('/').last;
-
-    final newResume = ResumeFile(name: fileName, path: path);
-
-    // If this is the first resume, make it default
-    if (_resumes.isEmpty) {
-      newResume.isDefault = true;
-    }
-
-    setState(() {
-      _resumes.add(newResume); // Add to the list
-    });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Added: $fileName')));
+  @override
+  void initState() {
+    super.initState();
+    _loadResumes();
   }
 
-  // --- 2. UPDATE _pickResume ---
-  // This function now just picks a file and calls our new helper
+  /// ================= LOAD =================
+  Future<void> _loadResumes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList('resumes_list') ?? [];
+
+    setState(() {
+      _resumes = raw.map((e) => ResumeFile.fromMap(jsonDecode(e))).toList();
+    });
+  }
+
+  /// ================= SAVE =================
+  Future<void> _persistResumes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      'resumes_list',
+      _resumes.map((e) => jsonEncode(e.toMap())).toList(),
+    );
+  }
+
+  /// ================= ADD RESUME =================
+  Future<void> _addNewResume(
+    String path, {
+    List<String> skills = const [],
+  }) async {
+    final name = path.split('/').last;
+
+    for (var r in _resumes) {
+      r.isDefault = false;
+    }
+
+    _resumes.insert(
+      0,
+      ResumeFile(name: name, path: path, isDefault: true, skills: skills),
+    );
+
+    await _persistResumes();
+    setState(() {});
+  }
+
+  /// ================= UPLOAD =================
   Future<void> _pickResume() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx'],
     );
 
     if (result != null) {
-      // Call our new function
-      _addNewResumeToList(result.files.single.path!);
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('File selection canceled.')));
+      await _addNewResume(result.files.single.path!, skills: []);
     }
   }
 
-  // --- (No changes to this function) ---
-  Future<void> _analyzeResume() async {
-    ResumeFile? defaultResume;
-    try {
-      defaultResume = _resumes.firstWhere((r) => r.isDefault);
-    } catch (e) {
-      defaultResume = null;
+  /// ================= SET DEFAULT =================
+  Future<void> _setDefault(ResumeFile resume) async {
+    for (var r in _resumes) {
+      r.isDefault = false;
+    }
+    resume.isDefault = true;
+
+    await _persistResumes();
+    setState(() {});
+  }
+
+  /// ================= DELETE =================
+  Future<void> _deleteResume(ResumeFile resume) async {
+    _resumes.remove(resume);
+
+    if (_resumes.isNotEmpty && !_resumes.any((r) => r.isDefault)) {
+      _resumes.first.isDefault = true;
     }
 
-    if (defaultResume == null) {
+    await _persistResumes();
+    setState(() {});
+  }
+
+  /// ================= AI ANALYSIS =================
+  Future<void> _analyzeResume() async {
+    final defaultResume = _resumes.where((r) => r.isDefault).toList();
+
+    if (defaultResume.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a resume first.')),
+        const SnackBar(content: Text('No default resume selected')),
       );
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
+    await Future.delayed(const Duration(seconds: 2));
+    setState(() => _isLoading = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Simulating AI analysis on ${defaultResume.name}...'),
-      ),
+    Navigator.pushNamed(
+      context,
+      '/analysis_results',
+      arguments: defaultResume.first,
     );
-
-    await Future.delayed(const Duration(seconds: 3));
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    Navigator.pushNamed(context, '/analysis_results');
   }
 
-  void _setDefault(ResumeFile resumeToSet) {
-    setState(() {
-      for (var resume in _resumes) {
-        resume.isDefault = false;
-      }
-      resumeToSet.isDefault = true;
-    });
-  }
-
-  void _deleteResume(ResumeFile resumeToDelete) {
-    setState(() {
-      _resumes.remove(resumeToDelete);
-    });
-  }
-
+  /// ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,117 +158,127 @@ class _ManageResumeScreenState extends State<ManageResumeScreen> {
           style: TextStyle(color: Colors.white),
         ),
         backgroundColor: Colors.blue,
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // --- 3. UPDATE THIS BUTTON'S onPressed ---
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.add),
-                label: const Text("Create with Resume Builder"),
-                onPressed: () async {
-                  // <-- Make it async
-                  // Wait for the builder screen to pop and send a result
-                  final result = await Navigator.pushNamed(
-                    context,
-                    '/resume_builder',
+            OutlinedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text("Create with Resume Builder"),
+              onPressed: () async {
+                final result = await Navigator.pushNamed(
+                  context,
+                  '/resume_builder',
+                );
+                if (result is Map) {
+                  await _addNewResume(
+                    result['path'],
+                    skills: List<String>.from(result['skills'] ?? []),
                   );
-
-                  // Check if we got a valid path back
-                  if (result != null && result is String) {
-                    _addNewResumeToList(result); // Add it to the list!
-                  }
-                },
-              ),
+                }
+              },
             ),
-            const SizedBox(height: 16),
-
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.upload_file),
-                label: const Text("Upload New Resume"),
-                onPressed: _pickResume,
-              ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.upload_file),
+              label: const Text("Upload New Resume"),
+              onPressed: _pickResume,
             ),
-            const Divider(height: 32),
-
-            Text(
+            const Divider(height: 30),
+            const Text(
               "Your Resumes",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 10),
+
+            /// ===== LIST =====
             Expanded(
               child: ListView.builder(
                 itemCount: _resumes.length,
-                itemBuilder: (context, index) {
-                  final resume = _resumes[index];
+                itemBuilder: (_, i) {
+                  final r = _resumes[i];
                   return Card(
-                    color: resume.isDefault ? Colors.blue[50] : Colors.white,
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.description,
-                        color: Colors.blue,
-                      ),
-                      title: Text(
-                        resume.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: resume.isDefault
-                          ? Text(
-                              "Default",
-                              style: TextStyle(
-                                color: Colors.green[700],
-                                fontWeight: FontWeight.bold,
+                    color: r.isDefault ? Colors.blue[50] : null,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.description, color: Colors.blue),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  r.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            )
-                          : TextButton(
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                alignment: Alignment.centerLeft,
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _deleteResume(r),
                               ),
-                              child: const Text("Set as Default"),
-                              onPressed: () => _setDefault(resume),
+                            ],
+                          ),
+                          if (r.isDefault)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Text(
+                                "Default",
+                                style: TextStyle(color: Colors.green),
+                              ),
                             ),
-                      trailing: IconButton(
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.red,
-                        ),
-                        onPressed: () => _deleteResume(resume),
+                          if (r.skills.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: r.skills
+                                  .map(
+                                    (s) => Chip(
+                                      label: Text(s),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                          if (!r.isDefault)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () => _setDefault(r),
+                                child: const Text("Set Default"),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   );
                 },
               ),
             ),
-            const SizedBox(height: 20),
 
+            /// ===== AI ANALYSIS =====
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
                 icon: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(color: Colors.white),
-                      )
+                    ? const CircularProgressIndicator(color: Colors.white)
                     : const Icon(Icons.insights, color: Colors.white),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  elevation: 5,
-                ),
                 label: Text(
                   _isLoading ? "Processing..." : "Run AI Analysis on Default",
-                  style: const TextStyle(fontSize: 16, color: Colors.white),
+                  style: const TextStyle(color: Colors.white),
                 ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                 onPressed: _isLoading ? null : _analyzeResume,
               ),
             ),

@@ -1,8 +1,5 @@
-// FILE: lib/screens/resume_builder_screen.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
-
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -30,12 +27,15 @@ class _ResumeBuilderScreenState extends State<ResumeBuilderScreen> {
     text: "B.Tech CSE - Galgotias University",
   );
 
+  // 🔥 SKILLS (DYNAMIC)
+  final TextEditingController _skillController = TextEditingController();
+  List<String> _skills = ["Flutter", "Dart", "Firebase"];
+
   bool _isLoading = false;
 
+  // ================= PDF GENERATION =================
   Future<void> _generatePdf() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final pdf = pw.Document();
 
@@ -55,6 +55,8 @@ class _ResumeBuilderScreenState extends State<ResumeBuilderScreen> {
               pw.Text(_emailController.text),
               pw.Text(_phoneController.text),
               pw.Divider(height: 20),
+
+              // ===== SUMMARY =====
               pw.Text(
                 "Summary",
                 style: pw.TextStyle(
@@ -63,7 +65,40 @@ class _ResumeBuilderScreenState extends State<ResumeBuilderScreen> {
                 ),
               ),
               pw.Text(_summaryController.text),
-              pw.SizedBox(height: 20),
+
+              pw.SizedBox(height: 16),
+
+              // ===== SKILLS =====
+              pw.Text(
+                "Skills",
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _skills
+                    .map(
+                      (skill) => pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border.all(),
+                          borderRadius: pw.BorderRadius.circular(5),
+                        ),
+                        child: pw.Text(skill),
+                      ),
+                    )
+                    .toList(),
+              ),
+
+              pw.SizedBox(height: 16),
+
+              // ===== EXPERIENCE =====
               pw.Text(
                 "Experience",
                 style: pw.TextStyle(
@@ -72,7 +107,10 @@ class _ResumeBuilderScreenState extends State<ResumeBuilderScreen> {
                 ),
               ),
               pw.Text(_expController.text),
-              pw.SizedBox(height: 20),
+
+              pw.SizedBox(height: 16),
+
+              // ===== EDUCATION =====
               pw.Text(
                 "Education",
                 style: pw.TextStyle(
@@ -88,24 +126,23 @@ class _ResumeBuilderScreenState extends State<ResumeBuilderScreen> {
     );
 
     final output = await getApplicationDocumentsDirectory();
-    final file = File("${output.path}/generated_resume.pdf");
+    final file = File(
+      "${output.path}/resume_${DateTime.now().millisecondsSinceEpoch}.pdf",
+    );
 
     await file.writeAsBytes(await pdf.save());
 
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
 
-    // --- THIS IS THE FIX ---
-    // First, show the snackbar and open the file
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('Resume saved to ${file.path}')));
+    ).showSnackBar(SnackBar(content: Text('Resume saved: ${file.path}')));
 
-    // THEN, pop the screen and send the file path back
-    Navigator.pop(context, file.path);
+    // ✅ SEND DATA BACK TO MANAGE RESUME
+    Navigator.pop(context, {'path': file.path, 'skills': _skills});
   }
 
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,67 +152,130 @@ class _ResumeBuilderScreenState extends State<ResumeBuilderScreen> {
           style: TextStyle(color: Colors.white),
         ),
         backgroundColor: Colors.blue,
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(24),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(labelText: 'Full Name'),
+            _buildTextField(_nameController, "Full Name"),
+            _buildTextField(_emailController, "Email"),
+            _buildTextField(_phoneController, "Phone"),
+            _buildTextField(_summaryController, "Summary", maxLines: 3),
+
+            const SizedBox(height: 20),
+
+            // ===== SKILLS UI =====
+            const Text(
+              "Skills",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(labelText: 'Email'),
+            const SizedBox(height: 8),
+
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: _skills.map((skill) {
+                return Chip(
+                  label: Text(skill),
+                  deleteIcon: const Icon(Icons.close, size: 18),
+                  onDeleted: () {
+                    setState(() {
+                      _skills.remove(skill);
+                    });
+                  },
+                );
+              }).toList(),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _phoneController,
-              decoration: InputDecoration(labelText: 'Phone'),
+
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _skillController,
+                    decoration: const InputDecoration(
+                      hintText: "Add skill",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                IconButton(
+                  icon: const Icon(Icons.add_circle, color: Colors.blue),
+                  onPressed: () {
+                    final skill = _skillController.text.trim();
+                    if (skill.isNotEmpty &&
+                        !_skills.any(
+                          (s) => s.toLowerCase() == skill.toLowerCase(),
+                        )) {
+                      setState(() {
+                        _skills.add(skill);
+                        _skillController.clear();
+                      });
+                    }
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _summaryController,
-              decoration: InputDecoration(labelText: 'Summary'),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _expController,
-              decoration: InputDecoration(labelText: 'Experience (1 entry)'),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _eduController,
-              decoration: InputDecoration(labelText: 'Education (1 entry)'),
-              maxLines: 2,
-            ),
+
+            const SizedBox(height: 20),
+            _buildTextField(_expController, "Experience", maxLines: 2),
+            _buildTextField(_eduController, "Education", maxLines: 2),
+
             const SizedBox(height: 30),
+
+            // ===== GENERATE BUTTON =====
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
                 icon: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(color: Colors.white),
-                      )
+                    ? const CircularProgressIndicator(color: Colors.white)
                     : const Icon(Icons.picture_as_pdf, color: Colors.white),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                onPressed: _isLoading ? null : _generatePdf,
                 label: Text(
                   _isLoading ? "Generating..." : "Generate PDF",
-                  style: TextStyle(color: Colors.white, fontSize: 18),
+                  style: const TextStyle(fontSize: 18, color: Colors.white),
                 ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                onPressed: _isLoading ? null : _generatePdf,
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  // ================= HELPER =================
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label, {
+    int maxLines = 1,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+      ),
+    );
+  }
+
+  // ================= DISPOSE =================
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _summaryController.dispose();
+    _expController.dispose();
+    _eduController.dispose();
+    _skillController.dispose();
+    super.dispose();
   }
 }

@@ -2,8 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:shared_preferences/shared_preferences.dart'; // 1. IMPORT
+import '../helpers/database_helper.dart';
 import 'service_details_screen.dart';
 
 class DailyWageScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
       child: Scaffold(
         backgroundColor: Colors.grey[100],
 
+        /// ADMIN POST BUTTON (UNCHANGED)
         floatingActionButton: FloatingActionButton(
           onPressed: () {
             Navigator.pushNamed(context, '/post_job');
@@ -51,7 +53,10 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
 
             Expanded(
               child: TabBarView(
-                children: [_buildServicesTab(), _buildCustomerJobsTab()],
+                children: [
+                  _buildServicesTab(),
+                  _buildCustomerJobsTab(), // 🔥 UPDATED
+                ],
               ),
             ),
           ],
@@ -60,7 +65,7 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
     );
   }
 
-  // --- WIDGETS FOR TAB 1 (SERVICES) ---
+  // ================= TAB 1 (SERVICES) =================
 
   Widget _buildServicesTab() {
     return _buildListView();
@@ -82,7 +87,6 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
                 ),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: EdgeInsets.zero,
               ),
             ),
           ),
@@ -93,7 +97,6 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
-              padding: const EdgeInsets.all(12),
             ),
             icon: Icon(_isMapView ? Icons.list : Icons.map, color: Colors.blue),
             onPressed: () {
@@ -147,13 +150,30 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       margin: const EdgeInsets.only(bottom: 12.0),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+      child: ListTile(
+        leading: Icon(icon, size: 40, color: Colors.blue),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(location),
+            RatingBar.builder(
+              initialRating: rating,
+              itemCount: 5,
+              itemSize: 16,
+              ignoreGestures: true,
+              itemBuilder: (_, __) =>
+                  const Icon(Icons.star, color: Colors.amber),
+              onRatingUpdate: (_) {},
+            ),
+          ],
+        ),
+        trailing: const Icon(Icons.chevron_right),
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ServiceDetailsScreen(
+              builder: (_) => ServiceDetailsScreen(
                 title: title,
                 icon: icon,
                 rating: rating,
@@ -162,75 +182,42 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
             ),
           );
         },
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            children: [
-              Icon(icon, size: 40, color: Colors.blue),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      location,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 4),
-                    RatingBar.builder(
-                      initialRating: rating,
-                      itemCount: 5,
-                      itemSize: 16,
-                      itemBuilder: (context, _) =>
-                          const Icon(Icons.star, color: Colors.amber),
-                      onRatingUpdate: (rating) {},
-                      ignoreGestures: true,
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: Colors.grey[500]),
-            ],
-          ),
-        ),
       ),
     );
   }
 
-  // --- WIDGETS FOR TAB 2 (CUSTOMER JOBS) ---
+  // ================= TAB 2 (ADMIN DAILY WAGE POSTS) =================
 
   Widget _buildCustomerJobsTab() {
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        // 2. PASS THE SKILL
-        _buildCustomerJobCard(
-          title: "Need plumber to fix leaky sink",
-          location: "Malviya Nagar",
-          time: "Posted 2h ago",
-          skill: "Plumber",
-        ),
-        _buildCustomerJobCard(
-          title: "Looking for part-time driver",
-          location: "Saket",
-          time: "Posted 5h ago",
-          skill: "Driver",
-        ),
-        _buildCustomerJobCard(
-          title: "Electrician needed for new wiring",
-          location: "Hauz Khas",
-          time: "Posted 1d ago",
-          skill: "Electrician",
-        ),
-      ],
+    return FutureBuilder<List<AdminPost>>(
+      future: DatabaseHelper.instance.getPostsByType(
+        'daily_wage',
+      ), // 🔥 KEY LINE
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text("No daily wage jobs available"));
+        }
+
+        final posts = snapshot.data!;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            return _buildCustomerJobCard(
+              title: post.role,
+              location: post.location,
+              time: post.company,
+              skill: post.role,
+            );
+          },
+        );
+      },
     );
   }
 
@@ -238,7 +225,7 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
     required String title,
     required String location,
     required String time,
-    required String skill, // 3. ACCEPT THE SKILL
+    required String skill,
   }) {
     return Card(
       elevation: 2,
@@ -256,25 +243,13 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                const Icon(Icons.location_on, size: 16),
                 const SizedBox(width: 4),
-                Text(
-                  location,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                ),
+                Text(location),
               ],
             ),
             const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Text(
-                  time,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                ),
-              ],
-            ),
+            Text("Company: $time"),
             const SizedBox(height: 10),
             SizedBox(
               width: 200,
@@ -282,28 +257,19 @@ class _DailyWageScreenState extends State<DailyWageScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[50],
                   elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
                 ),
-                // 4. MAKE BUTTON ASYNC
                 onPressed: () async {
-                  // 5. SAVE THE SKILL TO SHARED PREFERENCES
                   final prefs = await SharedPreferences.getInstance();
-                  // Get the current list
-                  List<String> currentSkills =
-                      prefs.getStringList('mySkills') ?? [];
-                  // Add the new skill (if it's not already there)
-                  if (!currentSkills.contains(skill)) {
-                    currentSkills.add(skill);
-                    await prefs.setStringList('mySkills', currentSkills);
+                  List<String> skills = prefs.getStringList('mySkills') ?? [];
+
+                  if (!skills.contains(skill)) {
+                    skills.add(skill);
+                    await prefs.setStringList('mySkills', skills);
                   }
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(
-                        'Job complete! "$skill" added to your profile.',
-                      ),
+                      content: Text('Job completed! "$skill" added to profile'),
                     ),
                   );
                 },
