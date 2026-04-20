@@ -1,7 +1,6 @@
-import 'dart:io' show Platform;
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io' show Platform;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Exception thrown by API client
@@ -27,25 +26,16 @@ class ApiClient {
     defaultValue: '',
   );
 
-  String _defaultBaseUrl() {
+  String get _platformDefaultBaseUrl {
     if (kIsWeb) return 'http://localhost:4000';
-
-    if (Platform.isAndroid) {
-      // Android emulator loopback to host machine.
-      return 'http://10.0.2.2:4000';
-    }
-
-    if (Platform.isIOS) {
-      // iOS simulator loopback to host machine.
-      return 'http://127.0.0.1:4000';
-    }
-
+    if (Platform.isAndroid) return 'http://10.0.2.2:4000';
+    if (Platform.isIOS) return 'http://127.0.0.1:4000';
     return 'http://localhost:4000';
   }
 
   String get baseUrl {
     if (_apiBaseUrlFromEnv.isNotEmpty) return _apiBaseUrlFromEnv;
-    return _defaultBaseUrl();
+    return _platformDefaultBaseUrl;
   }
 
   bool _isInitialized = false;
