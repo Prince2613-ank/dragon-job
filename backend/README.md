@@ -30,7 +30,11 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/dragon_jobs?schema=pu
 JWT_SECRET=your-strong-secret
 PORT=4000
 ADMIN_EMAILS=admin@example.com
+OPENAI_API_KEY=your-openai-key
+OPENAI_MODEL=gpt-4o-mini
 ```
+
+If `OPENAI_API_KEY` is omitted, resume parsing and matching still work using a heuristic fallback.
 
 4. Run migrations and generate client:
 
@@ -68,9 +72,14 @@ http://localhost:4000
 - `POST /auth/login`
 - `GET /users/me` (Bearer token)
 - `PUT /users/me` (Bearer token)
+- `GET /users/me/skills` (Bearer token)
+- `PUT /users/me/skills` (Bearer token)
+- `POST /users/me/skills` (Bearer token)
+- `DELETE /users/me/skills/:skill` (Bearer token)
 - `GET /posts`
 - `GET /posts?type=job|internship|daily_wage`
 - `POST /posts` (Bearer token, admin only)
 - `GET /saved-jobs` (Bearer token)
 - `POST /saved-jobs/:postId` (Bearer token)
 - `DELETE /saved-jobs/:postId` (Bearer token)
+- `POST /ai/analyze-resume` (Bearer token, multipart `resume`)

@@ -19,6 +19,7 @@ import 'screens/filter_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'screens/analysis_results_screen.dart';
 import 'screens/resume_builder_screen.dart';
+import 'screens/applied_jobs_screen.dart';
 
 // ADMIN & SETTINGS (🔥 NEW)
 import 'screens/settings_screen.dart';
@@ -67,6 +68,7 @@ class JobPortalApp extends StatelessWidget {
         '/edit_profile': (context) => const EditProfileScreen(),
         '/analysis_results': (context) => const AnalysisResultsScreen(),
         '/resume_builder': (context) => const ResumeBuilderScreen(),
+        '/applied_jobs': (context) => const AppliedJobsScreen(),
 
         // ================= SETTINGS & ADMIN =================
         '/settings': (context) => const SettingsScreen(),

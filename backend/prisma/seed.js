@@ -53,6 +53,15 @@ const seedPosts = [
     description: "Ship cross-platform features and improve app performance."
   },
   {
+    postType: PostType.job,
+    role: "React Frontend Developer",
+    company: "WebNest Labs",
+    salary: "13 LPA",
+    location: "Remote",
+    description:
+      "Build scalable web interfaces using React, JavaScript, HTML, and CSS. Collaborate with backend teams on REST API integration."
+  },
+  {
     postType: PostType.internship,
     role: "Software Engineer Intern",
     company: "LaunchPad Labs",
@@ -184,7 +193,7 @@ async function upsertSeedUsers() {
     }
   });
 
-  await prisma.user.upsert({
+  const normalUser = await prisma.user.upsert({
     where: { email: userEmail },
     update: {
       name: "Normal User",
@@ -199,7 +208,30 @@ async function upsertSeedUsers() {
     }
   });
 
-  return adminUser;
+  await prisma.$transaction(async (tx) => {
+    await tx.userSkill.deleteMany({
+      where: {
+        userId: {
+          in: [adminUser.id, normalUser.id]
+        }
+      }
+    });
+
+    await tx.userSkill.createMany({
+      data: [
+        { userId: adminUser.id, skill: "Flutter" },
+        { userId: adminUser.id, skill: "Node.js" },
+        { userId: adminUser.id, skill: "PostgreSQL" },
+        { userId: adminUser.id, skill: "Prisma" },
+        { userId: normalUser.id, skill: "Flutter" },
+        { userId: normalUser.id, skill: "Dart" },
+        { userId: normalUser.id, skill: "Firebase" }
+      ],
+      skipDuplicates: true
+    });
+  });
+
+  return { adminUser, normalUser };
 }
 
 async function upsertSeedPosts(createdById) {
@@ -235,11 +267,12 @@ async function upsertSeedPosts(createdById) {
 }
 
 async function main() {
-  const adminUser = await upsertSeedUsers();
+  const { adminUser, normalUser } = await upsertSeedUsers();
   const result = await upsertSeedPosts(adminUser.id);
 
   console.log(`Seed completed: inserted ${result.inserted}, skipped ${result.skipped}, total ${result.total}.`);
   console.log(`Admin seed user: ${adminUser.email}`);
+  console.log(`Normal seed user: ${normalUser.email}`);
 }
 
 main()

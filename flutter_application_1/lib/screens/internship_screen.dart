@@ -1,6 +1,7 @@
 // FILE: lib/screens/internship_screen.dart
 
 import 'package:flutter/material.dart';
+import '../helpers/applied_jobs_helper.dart';
 import '../helpers/database_helper.dart';
 import 'job_details_screen.dart';
 
@@ -16,14 +17,19 @@ class _InternshipScreenState extends State<InternshipScreen> {
 
   List<AdminPost> _allInternships = [];
   List<AdminPost> _displayedInternships = [];
+  Set<int> _appliedPostIds = {};
 
   bool _isSortedAscending = true;
 
   @override
   void initState() {
     super.initState();
-    _loadInternships();
+    _loadData();
     _searchController.addListener(_filterInternships);
+  }
+
+  Future<void> _loadData() async {
+    await Future.wait([_loadInternships(), _loadAppliedPostIds()]);
   }
 
   Future<void> _loadInternships() async {
@@ -31,9 +37,18 @@ class _InternshipScreenState extends State<InternshipScreen> {
       'internship',
     );
 
+    if (!mounted) return;
     setState(() {
       _allInternships = internships;
       _displayedInternships = internships;
+    });
+  }
+
+  Future<void> _loadAppliedPostIds() async {
+    final appliedIds = await AppliedJobsHelper.instance.getAppliedPostIds();
+    if (!mounted) return;
+    setState(() {
+      _appliedPostIds = appliedIds;
     });
   }
 
@@ -169,7 +184,7 @@ class _InternshipScreenState extends State<InternshipScreen> {
             MaterialPageRoute(
               builder: (_) => JobDetailsScreen(post: internship),
             ),
-          );
+          ).then((_) => _loadAppliedPostIds());
         },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -209,6 +224,27 @@ class _InternshipScreenState extends State<InternshipScreen> {
                   ],
                 ),
               ),
+              if (internship.id != null &&
+                  _appliedPostIds.contains(internship.id!))
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Text(
+                    'Applied',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),

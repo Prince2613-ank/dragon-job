@@ -28,6 +28,7 @@ model User {
   updatedAt    DateTime  @updatedAt
   createdPosts Post[]    @relation("PostsByUser")
   savedJobs    SavedJob[]
+  skills       UserSkill[]
 }
 
 model Post {
@@ -56,4 +57,15 @@ model SavedJob {
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
+}
+
+model UserSkill {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  skill     String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skill])
+  @@index([userId])
 }

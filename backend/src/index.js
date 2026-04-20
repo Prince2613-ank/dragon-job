@@ -7,6 +7,7 @@ const { authRouter } = require("./routes/auth.routes");
 const { postsRouter } = require("./routes/posts.routes");
 const { savedJobsRouter } = require("./routes/saved-jobs.routes");
 const { usersRouter } = require("./routes/users.routes");
+const { aiRouter } = require("./routes/ai.routes");
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use("/auth", authRouter);
 app.use("/posts", postsRouter);
 app.use("/saved-jobs", savedJobsRouter);
 app.use("/users", usersRouter);
+app.use("/ai", aiRouter);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

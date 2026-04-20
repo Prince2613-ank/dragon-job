@@ -53,7 +53,9 @@ Implemented now:
 - Backend auth (`/auth/signup`, `/auth/login`)
 - Backend posts (`/posts`, `/posts?type=...`, `/posts` create)
 - Backend user profile sync (`/users/me`)
-- Flutter app data operations are backend-only (auth, posts, saved jobs, profile)
+- Backend user-scoped skills sync (`/users/me/skills`)
+- Backend AI resume parsing + matching (`/ai/analyze-resume`)
+- Flutter app data operations are backend-only (auth, posts, saved jobs, profile, skills, resume analysis)
 - No local SQLite dependency in frontend
 
 Still local in frontend:

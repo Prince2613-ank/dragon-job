@@ -1,6 +1,7 @@
 // FILE: lib/screens/recommended_jobs_screen.dart
 
 import 'package:flutter/material.dart';
+import '../helpers/applied_jobs_helper.dart';
 import '../helpers/database_helper.dart';
 import 'job_details_screen.dart';
 
@@ -13,17 +14,31 @@ class RecommendedJobsScreen extends StatefulWidget {
 
 class _RecommendedJobsScreenState extends State<RecommendedJobsScreen> {
   List<AdminPost> _recommendedJobs = [];
+  Set<int> _appliedPostIds = {};
 
   @override
   void initState() {
     super.initState();
-    _loadRecommendedJobs();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await Future.wait([_loadRecommendedJobs(), _loadAppliedPostIds()]);
   }
 
   Future<void> _loadRecommendedJobs() async {
     final jobs = await DatabaseHelper.instance.getPostsByType('job');
+    if (!mounted) return;
     setState(() {
       _recommendedJobs = jobs;
+    });
+  }
+
+  Future<void> _loadAppliedPostIds() async {
+    final appliedIds = await AppliedJobsHelper.instance.getAppliedPostIds();
+    if (!mounted) return;
+    setState(() {
+      _appliedPostIds = appliedIds;
     });
   }
 
@@ -74,7 +89,7 @@ class _RecommendedJobsScreenState extends State<RecommendedJobsScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => JobDetailsScreen(post: post)),
-          );
+          ).then((_) => _loadAppliedPostIds());
         },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -114,6 +129,26 @@ class _RecommendedJobsScreenState extends State<RecommendedJobsScreen> {
                   ],
                 ),
               ),
+              if (post.id != null && _appliedPostIds.contains(post.id!))
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Text(
+                    'Applied',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),

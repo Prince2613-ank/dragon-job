@@ -1,8 +1,8 @@
 // FILE: lib/screens/job_details_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../helpers/database_helper.dart';
+import '../helpers/applied_jobs_helper.dart';
 
 class JobDetailsScreen extends StatefulWidget {
   final AdminPost post; // 🔥 ADMIN POST
@@ -21,6 +21,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   void initState() {
     super.initState();
     _checkIfSaved();
+    _checkIfApplied();
   }
 
   // ================= SAVE CHECK =================
@@ -31,8 +32,20 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         if (widget.post.id != null && job.postId != null) {
           return job.postId == widget.post.id;
         }
-        return job.title == widget.post.role && job.company == widget.post.company;
+        return job.title == widget.post.role &&
+            job.company == widget.post.company;
       });
+    });
+  }
+
+  Future<void> _checkIfApplied() async {
+    final postId = widget.post.id;
+    if (postId == null) return;
+
+    final applied = await AppliedJobsHelper.instance.isApplied(postId);
+    if (!mounted) return;
+    setState(() {
+      _isApplied = applied;
     });
   }
 
@@ -67,15 +80,28 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   }
 
   // ================= APPLY =================
-  void _applyForJob() async {
-    final prefs = await SharedPreferences.getInstance();
-    int count = prefs.getInt('jobsAppliedCount') ?? 0;
-    await prefs.setInt('jobsAppliedCount', count + 1);
+  Future<void> _applyForJob() async {
+    final postId = widget.post.id;
+    if (postId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to apply for this post.')),
+      );
+      return;
+    }
 
+    final added = await AppliedJobsHelper.instance.markApplied(postId);
+
+    if (!mounted) return;
     setState(() => _isApplied = true);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Application submitted successfully')),
+      SnackBar(
+        content: Text(
+          added
+              ? 'Application submitted successfully'
+              : 'Already applied to this job',
+        ),
+      ),
     );
   }
 

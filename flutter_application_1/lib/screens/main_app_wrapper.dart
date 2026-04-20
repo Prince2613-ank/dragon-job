@@ -45,7 +45,6 @@ class _MainAppWrapperState extends State<MainAppWrapper> {
       appBar: AppBar(
         title: Text(_pageTitles[_selectedIndex]),
         actions: [
-          // 1. ADD THE NOTIFICATION ICON BUTTON
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {

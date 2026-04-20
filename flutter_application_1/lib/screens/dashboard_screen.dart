@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../helpers/applied_jobs_helper.dart';
 import '../helpers/database_helper.dart';
 import 'job_details_screen.dart';
 
@@ -15,6 +16,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int profileCompletion = 0;
   int resumeScore = 0;
   int jobsApplied = 0;
+  Set<int> _appliedPostIds = {};
 
   List<AdminPost> recommendedPosts = [];
 
@@ -33,10 +35,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ================= LOAD DATA =================
   Future<void> _loadDashboardData() async {
     final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('loggedInUserId') ?? 0;
 
-    profileCompletion = prefs.getInt('profile_completion') ?? 0;
-    resumeScore = prefs.getInt('last_resume_score') ?? 0;
-    jobsApplied = prefs.getInt('jobsAppliedCount') ?? 0;
+    profileCompletion = prefs.getInt('profile_completion_user_$userId') ?? 0;
+    resumeScore = prefs.getInt('last_resume_score_user_$userId') ?? 0;
+    _appliedPostIds = await AppliedJobsHelper.instance.getAppliedPostIds();
+    jobsApplied = _appliedPostIds.length;
 
     recommendedPosts = await DatabaseHelper.instance.getAllAdminPosts();
 
@@ -164,34 +168,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildStats() {
     return Row(
       children: [
-        _statCard(title: "Jobs Applied", value: jobsApplied.toString()),
+        _statCard(
+          title: "Jobs Applied",
+          value: jobsApplied.toString(),
+          onTap: () => Navigator.pushNamed(context, '/applied_jobs'),
+        ),
         const SizedBox(width: 16),
-        _statCard(title: "Resume Score", value: "$resumeScore%"),
+        _statCard(
+          title: "Resume Score",
+          value: "$resumeScore%",
+          onTap: () => Navigator.pushNamed(context, '/manage_resume'),
+        ),
       ],
     );
   }
 
-  Widget _statCard({required String title, required String value}) {
+  Widget _statCard({
+    required String title,
+    required String value,
+    VoidCallback? onTap,
+  }) {
     return Expanded(
       child: Card(
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(title, style: const TextStyle(color: Colors.grey)),
-            ],
+                const SizedBox(height: 6),
+                Text(title, style: const TextStyle(color: Colors.grey)),
+              ],
+            ),
           ),
         ),
       ),
@@ -233,15 +253,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.work, color: Colors.blue),
                   title: Text(post.role),
-                  subtitle: Text("${post.company} • ${post.location}"),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  subtitle: Text("${post.company} - ${post.location}"),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (post.id != null && _appliedPostIds.contains(post.id!))
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Text(
+                            'Applied',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      const Icon(Icons.arrow_forward_ios, size: 16),
+                    ],
+                  ),
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => JobDetailsScreen(post: post),
                       ),
-                    );
+                    ).then((_) => _loadDashboardData());
                   },
                 ),
               ),
