@@ -1,6 +1,6 @@
 # Dragon Jobs Flutter App
 
-This app now supports a backend-first data flow with local SQLite fallback.
+This app now uses a backend-only data flow via Express APIs backed by PostgreSQL.
 
 ## Project structure
 
@@ -53,10 +53,9 @@ Implemented now:
 - Backend auth (`/auth/signup`, `/auth/login`)
 - Backend posts (`/posts`, `/posts?type=...`, `/posts` create)
 - Backend user profile sync (`/users/me`)
-- Flutter database helper is backend-first for auth and posts
-- Local SQLite fallback remains active if backend is unavailable
+- Flutter app data operations are backend-only (auth, posts, saved jobs, profile)
+- No local SQLite dependency in frontend
 
-Not yet migrated (still local-first):
+Still local in frontend:
 
-- Saved jobs sync with backend endpoints
-- Some profile preference fields stored in `SharedPreferences`
+- UI/session preferences in `SharedPreferences` (for example counters, small UI flags)

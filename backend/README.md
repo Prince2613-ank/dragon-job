@@ -44,6 +44,12 @@ npm run prisma:migrate -- --name init
 npm run prisma:seed
 ```
 
+Seed behavior:
+- Adds a larger catalog of jobs/internships/daily-wage posts (idempotent).
+- Creates/updates one admin and one normal user.
+- Admin email is taken from `ADMIN_EMAILS` first value.
+- Default seed password is `Password@123` (override via `SEED_DEFAULT_PASSWORD`).
+
 6. Start API:
 
 ```bash
